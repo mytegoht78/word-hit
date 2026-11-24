@@ -1,0 +1,359 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex, nofollow">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ワードヒットチェッカー</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%232563eb'/%3E%3Ccircle cx='14' cy='14' r='7' fill='none' stroke='%23fff' stroke-width='3'/%3E%3Cline x1='19' y1='19' x2='25' y2='25' stroke='%23fff' stroke-width='3.5' stroke-linecap='round'/%3E%3Crect x='10' y='12.5' width='8' height='3' rx='1' fill='%23fde68a'/%3E%3C/svg%3E">
+<style>
+  :root {
+    --bg: #f4f5f7;
+    --panel: #ffffff;
+    --border: #d9dce1;
+    --text: #1f2328;
+    --muted: #6b7280;
+    --accent: #2563eb;
+    --hit: #fde68a;
+    --ok: #16a34a;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: "Segoe UI", "Yu Gothic UI", "Meiryo", sans-serif;
+    font-size: 14px;
+    display: flex;
+    flex-direction: column;
+  }
+  header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 16px;
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+  }
+  header h1 { font-size: 16px; margin: 0; font-weight: 600; }
+  header .spacer { flex: 1; }
+  button {
+    font: inherit;
+    padding: 6px 14px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: var(--panel);
+    cursor: pointer;
+  }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button:hover { filter: brightness(0.96); }
+
+  main {
+    flex: 1;
+    min-height: 0;
+    display: grid;
+    grid-template-rows: minmax(150px, 0.6fr) minmax(180px, 1fr) auto;
+    gap: 12px;
+    padding: 12px 16px 16px;
+  }
+  .inputs {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 12px;
+    min-height: 0;
+  }
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+  .panel-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border);
+  }
+  .panel-head h2 { font-size: 13px; margin: 0; font-weight: 600; }
+  .panel-head .count { color: var(--muted); font-size: 12px; }
+  .panel-head .spacer { flex: 1; }
+  .panel-head button { padding: 2px 10px; font-size: 12px; }
+  textarea {
+    flex: 1;
+    width: 100%;
+    min-height: 0;
+    resize: none;
+    border: 0;
+    outline: none;
+    padding: 10px 12px;
+    font: inherit;
+    line-height: 1.6;
+    background: transparent;
+    color: var(--text);
+  }
+  #words { font-family: Consolas, "BIZ UDGothic", monospace; }
+
+  .results .summary { color: var(--muted); font-size: 12px; }
+  .results .summary b { color: var(--ok); }
+  .result-list { flex: 1; overflow: auto; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { text-align: left; padding: 6px 12px; border-bottom: 1px solid #eef0f3; vertical-align: top; }
+  th { position: sticky; top: 0; background: #fafbfc; font-size: 12px; color: var(--muted); font-weight: 600; }
+  td.num { width: 64px; text-align: right; font-variant-numeric: tabular-nums; }
+  td.word { width: 22%; font-weight: 600; }
+  td.ctx { color: var(--muted); }
+  td.ctx mark { background: var(--hit); color: var(--text); padding: 0 1px; border-radius: 2px; }
+  td.ctx .line + .line { margin-top: 4px; padding-top: 4px; border-top: 1px dashed #eef0f3; }
+  td.ctx .more { margin-top: 4px; font-size: 12px; color: var(--accent); }
+  .copybar { display: flex; flex-direction: row; align-items: center; gap: 8px; padding: 8px 12px; }
+  .copybar h2 { font-size: 13px; margin: 0; font-weight: 600; white-space: nowrap; }
+  .copybar input {
+    flex: 1; min-width: 0; font: inherit; padding: 6px 10px;
+    border: 1px solid var(--border); border-radius: 6px; background: #fafbfc; color: var(--text);
+  }
+  .copybar button { white-space: nowrap; }
+  .copybar .done { color: var(--ok); font-size: 12px; white-space: nowrap; min-width: 6em; }
+  header .note { color: var(--muted); font-size: 12px; }
+  .empty { padding: 24px; text-align: center; color: var(--muted); }
+
+  @media (max-width: 720px) {
+    .inputs { grid-template-columns: 1fr; grid-template-rows: 1fr 1fr; }
+    main { grid-template-rows: minmax(320px, auto) minmax(220px, 1fr) auto; }
+  }
+</style>
+</head>
+<body>
+  <header>
+    <h1>ワードヒットチェッカー</h1>
+    <div class="spacer"></div>
+    <span class="note">大文字/小文字・全角/半角・ひらがな/カタカナは区別しません</span>
+    <button id="btnClear">すべてクリア</button>
+  </header>
+
+  <main>
+    <section class="inputs">
+      <div class="panel">
+        <div class="panel-head">
+          <h2>対象テキスト</h2>
+          <span class="count" id="textCount">0 文字</span>
+          <div class="spacer"></div>
+          <button id="btnPaste">貼り付け</button>
+        </div>
+        <textarea id="text" placeholder="ここに調べたいテキストを貼り付け"></textarea>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head">
+          <h2>検索ワード</h2>
+          <span class="count" id="wordCount">0 ワード</span>
+        </div>
+        <textarea id="words" placeholder="1行に1ワード&#10;例：&#10;りんご&#10;バナナ&#10;みかん"></textarea>
+      </div>
+    </section>
+
+    <section class="panel results">
+      <div class="panel-head">
+        <h2>ヒット一覧</h2>
+        <span class="summary" id="summary"></span>
+      </div>
+      <div class="result-list" id="resultList"></div>
+    </section>
+
+    <section class="panel copybar">
+      <h2>コピー用</h2>
+      <input id="copyText" type="text" readonly placeholder="ヒットしたワードがここに並びます">
+      <button id="btnCopy" class="primary">クリップボードにコピー</button>
+      <span class="done" id="copyDone"></span>
+    </section>
+  </main>
+
+<script>
+(() => {
+  const $text = document.getElementById('text');
+  const $words = document.getElementById('words');
+  const $textCount = document.getElementById('textCount');
+  const $wordCount = document.getElementById('wordCount');
+  const $summary = document.getElementById('summary');
+  const $list = document.getElementById('resultList');
+  const $copyText = document.getElementById('copyText');
+  const $copyDone = document.getElementById('copyDone');
+
+  const CTX_MAX = 40;      // 前後に表示する最大文字数
+  const CTX_LIMIT = 10;    // 1ワードあたり表示する該当箇所の上限
+  const STOPS = '。．.！!？?\n';
+
+  // ---- 表記ゆれの正規化 ----
+  // NFKC（全角英数→半角、半角カナ→全角カナ）→ 小文字化 → カタカナをひらがなへ
+  function kataToHira(s) {
+    return s.replace(/[ァ-ヶ]/g, c => String.fromCharCode(c.charCodeAt(0) - 0x60));
+  }
+  function normalize(s) {
+    return kataToHira(s.normalize('NFKC').toLowerCase());
+  }
+
+  // 正規化後の文字位置 → 元テキストの位置 の対応表をつくる
+  function buildIndex(text) {
+    const pieces = [];   // {c, s, e}
+    let i = 0;
+    for (const ch of text) {
+      const s = i, e = i + ch.length;
+      i = e;
+      const n = normalize(ch);
+      // 半角の濁点・半濁点（ﾞﾟ）は直前の文字と合成する（ｶﾞ → が）
+      if ((n === '゙' || n === '゚') && pieces.length) {
+        const last = pieces[pieces.length - 1];
+        const comb = (last.c + n).normalize('NFC');
+        if (comb.length === 1) { last.c = comb; last.e = e; continue; }
+      }
+      pieces.push({ c: n, s, e });
+    }
+    let norm = '';
+    const starts = [], ends = [];
+    for (const p of pieces) {
+      norm += p.c;
+      for (let k = 0; k < p.c.length; k++) { starts.push(p.s); ends.push(p.e); }
+    }
+    return { norm, starts, ends };
+  }
+
+  function parseWords(raw) {
+    const seen = new Set();
+    const list = [];
+    for (const line of raw.split(/\r?\n/)) {
+      const w = line.trim();
+      if (!w) continue;
+      const n = normalize(w);
+      if (!n || seen.has(n)) continue;
+      seen.add(n);
+      list.push({ label: w, norm: n });
+    }
+    return list;
+  }
+
+  // ヒット位置を含む文の範囲（元テキスト上）
+  function sentenceRange(text, s, e) {
+    let a = s;
+    while (a > 0 && !STOPS.includes(text[a - 1]) && s - a < CTX_MAX) a--;
+    let b = e;
+    while (b < text.length && e - b > -CTX_MAX) {
+      const c = text[b++];
+      if (STOPS.includes(c)) { if (c === '\n') b--; break; }
+    }
+    return [a, b];
+  }
+
+  const esc = s => s.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+  function renderContext(text, range, hits) {
+    const [a, b] = range;
+    let html = a > 0 && !STOPS.includes(text[a - 1]) ? '…' : '';
+    let pos = a;
+    for (const [s, e] of hits) {
+      html += esc(text.slice(pos, s)) + '<mark>' + esc(text.slice(s, e)) + '</mark>';
+      pos = e;
+    }
+    html += esc(text.slice(pos, b));
+    if (b < text.length && !STOPS.includes(text[b - 1]) && text[b] !== '\n') html += '…';
+    return html.replace(/\s+/g, ' ').trim();
+  }
+
+  function search() {
+    const text = $text.value;
+    const words = parseWords($words.value);
+    $textCount.textContent = text.length.toLocaleString() + ' 文字';
+    $wordCount.textContent = words.length + ' ワード';
+
+    $copyText.value = '';
+    $copyDone.textContent = '';
+    if (!text.trim() || !words.length) {
+      $summary.textContent = '';
+      $list.innerHTML = '<div class="empty">' +
+        (!text.trim() ? '左に対象テキストを貼り付けてください' : '右に検索ワードを1行ずつ入力してください') + '</div>';
+      return;
+    }
+
+    const idx = buildIndex(text);
+    const results = [];
+    let total = 0;
+    for (const w of words) {
+      const hits = [];
+      let p = idx.norm.indexOf(w.norm);
+      while (p !== -1) {
+        hits.push([idx.starts[p], idx.ends[p + w.norm.length - 1]]);
+        p = idx.norm.indexOf(w.norm, p + w.norm.length);
+      }
+      if (!hits.length) continue;
+      total += hits.length;
+
+      // 同じ文に入るヒットはまとめて1行に
+      const groups = [];
+      for (const h of hits) {
+        const last = groups[groups.length - 1];
+        if (last && h[0] < last.range[1]) {
+          last.hits.push(h);
+          last.range[1] = Math.max(last.range[1], h[1]);
+        } else {
+          groups.push({ range: sentenceRange(text, h[0], h[1]), hits: [h] });
+        }
+      }
+      results.push({ w, count: hits.length, groups });
+    }
+
+    $copyText.value = results.map(r => r.w.label).join(' ');
+    $summary.innerHTML = `<b>${results.length}</b> / ${words.length} ワードがヒット（合計 ${total.toLocaleString()} 件）`;
+
+    if (!results.length) {
+      $list.innerHTML = '<div class="empty">ヒットしたワードはありません</div>';
+      return;
+    }
+
+    let rows = '';
+    for (const r of results) {
+      const shown = r.groups.slice(0, CTX_LIMIT)
+        .map(g => '<div class="line">' + renderContext(text, g.range, g.hits) + '</div>').join('');
+      const more = r.groups.length > CTX_LIMIT ? `<div class="more">ほか ${r.groups.length - CTX_LIMIT} 箇所</div>` : '';
+      rows += `<tr><td class="word">${esc(r.w.label)}</td><td class="num">${r.count.toLocaleString()}</td><td class="ctx">${shown}${more}</td></tr>`;
+    }
+    $list.innerHTML = `<table><thead><tr><th>ワード</th><th style="text-align:right">件数</th><th>該当箇所（前後の文）</th></tr></thead><tbody>${rows}</tbody></table>`;
+  }
+
+  let timer = 0;
+  const schedule = () => { clearTimeout(timer); timer = setTimeout(search, 150); };
+  $text.addEventListener('input', schedule);
+  $words.addEventListener('input', schedule);
+
+  document.getElementById('btnClear').addEventListener('click', () => {
+    $text.value = ''; $words.value = ''; search(); $text.focus();
+  });
+  document.getElementById('btnCopy').addEventListener('click', async () => {
+    const v = $copyText.value;
+    if (!v) { $copyDone.style.color = 'var(--muted)'; $copyDone.textContent = 'ヒットなし'; return; }
+    try {
+      await navigator.clipboard.writeText(v);
+    } catch {
+      $copyText.select();
+      document.execCommand('copy');
+    }
+    $copyDone.style.color = '';
+    $copyDone.textContent = 'コピーしました';
+    clearTimeout($copyDone._t);
+    $copyDone._t = setTimeout(() => { $copyDone.textContent = ''; }, 2000);
+  });
+
+  document.getElementById('btnPaste').addEventListener('click', async () => {
+    try {
+      $text.value = await navigator.clipboard.readText();
+      search();
+    } catch {
+      alert('クリップボードを読み取れませんでした。Ctrl+V で貼り付けてください。');
+    }
+  });
+
+  search();
+})();
+</script>
+</body>
+</html>
